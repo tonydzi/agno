@@ -541,7 +541,7 @@ def _run(
                 #   - compacted_messages: compressed view for model (summary + recent)
                 if agent.compression_manager is not None:
                     log_debug(f"[RUN-SYNC] Pre-loop compaction check: {len(run_messages.messages)} messages")
-                    compaction_result = agent.compression_manager.compact_history(
+                    compaction_result = agent.compression_manager.compress_message_history(
                         run_messages.messages,
                         run_response=run_response,
                         run_metrics=run_response.metrics,
@@ -991,7 +991,7 @@ def _run_stream(
                 # 6. Pre-loop compaction: compress history BEFORE first model call
                 if agent.compression_manager is not None:
                     messages_before = len(run_messages.messages)
-                    compaction_result = agent.compression_manager.compact_history(
+                    compaction_result = agent.compression_manager.compress_message_history(
                         run_messages.messages,
                         run_response=run_response,
                         run_metrics=run_response.metrics,
@@ -1009,7 +1009,7 @@ def _run_stream(
                                 store_events=agent.store_events,
                             )
                         run_messages.compacted_messages = compaction_result.compacted_messages
-                        tokens_saved = run_response.compaction.total_tokens_saved if run_response.compaction else 0
+                        tokens_saved = run_response.compaction_state.total_tokens_saved if run_response.compaction_state else 0
                         if stream_events:
                             yield handle_event(  # type: ignore
                                 create_compaction_completed_event(
@@ -1750,7 +1750,7 @@ async def _arun(
                 #   - compacted_messages: compressed view for model (summary + recent)
                 if agent.compression_manager is not None:
                     log_debug(f"[RUN-ASYNC] Pre-loop compaction check: {len(run_messages.messages)} messages")
-                    compaction_result = await agent.compression_manager.acompact_history(
+                    compaction_result = await agent.compression_manager.acompress_message_history(
                         run_messages.messages,
                         run_response=run_response,
                         run_metrics=run_response.metrics,
@@ -2544,7 +2544,7 @@ async def _arun_stream(
                 # 9. Pre-loop compaction: compress history BEFORE first model call
                 if agent.compression_manager is not None:
                     messages_before = len(run_messages.messages)
-                    compaction_result = await agent.compression_manager.acompact_history(
+                    compaction_result = await agent.compression_manager.acompress_message_history(
                         run_messages.messages,
                         run_response=run_response,
                         run_metrics=run_response.metrics,
@@ -2562,7 +2562,7 @@ async def _arun_stream(
                                 store_events=agent.store_events,
                             )
                         run_messages.compacted_messages = compaction_result.compacted_messages
-                        tokens_saved = run_response.compaction.total_tokens_saved if run_response.compaction else 0
+                        tokens_saved = run_response.compaction_state.total_tokens_saved if run_response.compaction_state else 0
                         if stream_events:
                             yield handle_event(  # type: ignore
                                 create_compaction_completed_event(
@@ -4095,7 +4095,7 @@ def _continue_run_stream(
                 # 3. Pre-loop compaction: compress history BEFORE model call
                 if agent.compression_manager is not None:
                     messages_before = len(run_messages.messages)
-                    compaction_result = agent.compression_manager.compact_history(
+                    compaction_result = agent.compression_manager.compress_message_history(
                         run_messages.messages,
                         run_response=run_response,
                         run_metrics=run_response.metrics,
@@ -4113,7 +4113,7 @@ def _continue_run_stream(
                                 store_events=agent.store_events,
                             )
                         run_messages.compacted_messages = compaction_result.compacted_messages
-                        tokens_saved = run_response.compaction.total_tokens_saved if run_response.compaction else 0
+                        tokens_saved = run_response.compaction_state.total_tokens_saved if run_response.compaction_state else 0
                         if stream_events:
                             yield handle_event(  # type: ignore
                                 create_compaction_completed_event(
@@ -5577,7 +5577,7 @@ async def _acontinue_run_stream(
                 # 8. Pre-loop compaction: compress history BEFORE model call
                 if agent.compression_manager is not None:
                     messages_before = len(run_messages.messages)
-                    compaction_result = await agent.compression_manager.acompact_history(
+                    compaction_result = await agent.compression_manager.acompress_message_history(
                         run_messages.messages,
                         run_response=run_response,
                         run_metrics=run_response.metrics,
@@ -5595,7 +5595,7 @@ async def _acontinue_run_stream(
                                 store_events=agent.store_events,
                             )
                         run_messages.compacted_messages = compaction_result.compacted_messages
-                        tokens_saved = run_response.compaction.total_tokens_saved if run_response.compaction else 0
+                        tokens_saved = run_response.compaction_state.total_tokens_saved if run_response.compaction_state else 0
                         if stream_events:
                             yield handle_event(  # type: ignore
                                 create_compaction_completed_event(

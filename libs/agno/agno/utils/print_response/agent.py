@@ -193,7 +193,7 @@ def print_response_stream(
                 show_full_reasoning=show_full_reasoning,
                 accumulated_tool_calls=accumulated_tool_calls,
                 compression_manager=agent.compression_manager,
-                context_compaction_manager=agent.context_compaction_manager,
+                context_compaction_manager=agent.compression_manager.context_compaction_manager if agent.compression_manager else None,
             )
             panels.extend(additional_panels)
             if panels:
@@ -399,7 +399,7 @@ async def aprint_response_stream(
                 show_full_reasoning=show_full_reasoning,
                 accumulated_tool_calls=accumulated_tool_calls,
                 compression_manager=agent.compression_manager,
-                context_compaction_manager=agent.context_compaction_manager,
+                context_compaction_manager=agent.compression_manager.context_compaction_manager if agent.compression_manager else None,
             )
             panels.extend(additional_panels)
             if panels:

@@ -211,7 +211,7 @@ def set_compression_manager(agent: Agent) -> None:
         agent.compression_manager = CompressionManager(
             model=agent.model,
             compress_tool_results=True,
-            compact_history=False,  # only tool compression via flag
+            compress_messages=False,  # only tool compression via flag
         )
 
     # Set model if not already set

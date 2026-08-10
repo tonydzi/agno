@@ -18,35 +18,35 @@ if TYPE_CHECKING:
 
 @dataclass
 class CompressionManager:
-    """Unified context manager for tool compression and history compaction.
+    """Unified compression manager for tool results and message history.
 
-    Single entry point for all context management. Internally creates and manages:
+    Single entry point for all compression. Internally creates and manages:
     - Tool compression (lightweight, compresses individual tool results)
-    - History compaction (heavier, summarizes old conversation history)
+    - Message compression (heavier, summarizes old conversation history)
 
     Usage:
-        context_manager = ContextManager(
+        compression_manager = CompressionManager(
             model=OpenAI(id="gpt-4o-mini"),
             compress_tool_results=True,
-            compact_history=True,
+            compress_messages=True,
         )
     """
 
     model: Optional[Model] = None
 
-    # Tool compression settings
+    # Tool compression
     compress_tool_results: bool = True
-    tool_results_limit: Optional[int] = None  # trigger after N tool results
-    tool_token_limit: Optional[int] = None  # trigger at N tokens
-    tool_compression_instructions: Optional[str] = None
+    compress_tool_results_limit: Optional[int] = None
+    compress_token_limit: Optional[int] = None
+    compress_tool_call_instructions: Optional[str] = None
 
-    # History compaction settings
-    compact_history: bool = True
-    message_limit: Optional[int] = None  # trigger at N messages (default: 10)
-    history_token_limit: Optional[int] = None  # trigger at N tokens
-    keep_recent: int = 10  # messages to keep intact
-    preserve_user_budget: int = 20_000  # token budget for preserving user messages
-    compaction_instructions: Optional[str] = None
+    # Message compression
+    compress_messages: bool = True
+    compress_messages_limit: Optional[int] = None
+    compress_messages_token_limit: Optional[int] = None
+    compress_messages_keep_recent_count: int = 10
+    compress_messages_preserve_user_budget: Optional[int] = None
+    compress_messages_instructions: Optional[str] = None
 
     stats: Dict[str, Any] = field(default_factory=dict)
 
@@ -59,19 +59,19 @@ class CompressionManager:
             self._tool_compressor = ToolCompressionManager(
                 model=self.model,
                 compress_tool_results=True,
-                compress_tool_results_limit=self.tool_results_limit,
-                compress_token_limit=self.tool_token_limit,
-                compress_tool_call_instructions=self.tool_compression_instructions,
+                compress_tool_results_limit=self.compress_tool_results_limit,
+                compress_token_limit=self.compress_token_limit,
+                compress_tool_call_instructions=self.compress_tool_call_instructions,
             )
 
-        if self.compact_history:
+        if self.compress_messages:
             self._history_compactor = ContextCompactionManager(
                 model=self.model,
-                message_limit=self.message_limit,
-                token_limit=self.history_token_limit,
-                keep_recent=self.keep_recent,
-                preserve_user_budget=self.preserve_user_budget,
-                instructions=self.compaction_instructions,
+                message_limit=self.compress_messages_limit,
+                token_limit=self.compress_messages_token_limit,
+                keep_recent=self.compress_messages_keep_recent_count,
+                preserve_user_budget=self.compress_messages_preserve_user_budget,
+                instructions=self.compress_messages_instructions,
             )
 
     # --- Backward compatibility properties ---
@@ -112,6 +112,10 @@ class CompressionManager:
             return False
         return await self._tool_compressor.ashould_compress(messages, tools, model, response_format)
 
+    # Backward compat aliases (base.py calls these)
+    should_compress = should_compress_tools
+    ashould_compress = ashould_compress_tools
+
     def compress_tools(
         self,
         messages: List[Message],
@@ -120,7 +124,7 @@ class CompressionManager:
         """Compress tool results in-place (sets msg.compressed_content)."""
         if self._tool_compressor is None:
             return
-        log_debug("[CONTEXT_MANAGER] compress_tools()")
+        log_debug("[COMPRESSION_MANAGER] compress_tools()")
         self._tool_compressor.compress(messages, run_metrics)
         self._sync_stats()
 
@@ -132,48 +136,48 @@ class CompressionManager:
         """Async compress tool results in-place."""
         if self._tool_compressor is None:
             return
-        log_debug("[CONTEXT_MANAGER] acompress_tools()")
+        log_debug("[COMPRESSION_MANAGER] acompress_tools()")
         await self._tool_compressor.acompress(messages, run_metrics)
         self._sync_stats()
 
-    # --- History compaction (pre-loop) ---
+    # --- Message compression (pre-loop) ---
 
-    def should_compact_history(self, messages: List[Message]) -> bool:
-        """Check if history should be compacted."""
+    def should_compress_messages(self, messages: List[Message]) -> bool:
+        """Check if messages should be compressed."""
         if self._history_compactor is None:
             return False
         return self._history_compactor.should_compact(messages)
 
-    async def ashould_compact_history(self, messages: List[Message]) -> bool:
-        """Async check if history should be compacted."""
+    async def ashould_compress_messages(self, messages: List[Message]) -> bool:
+        """Async check if messages should be compressed."""
         if self._history_compactor is None:
             return False
         return await self._history_compactor.ashould_compact(messages)
 
-    def compact_history(
+    def compress_message_history(
         self,
         messages: List[Message],
         run_response: Optional["RunOutput"] = None,
         run_metrics: Optional["RunMetrics"] = None,
     ) -> CompactionResult:
-        """Compact history into summary message."""
+        """Compress message history into summary message."""
         if self._history_compactor is None:
             return CompactionResult(compacted_messages=messages, summary=None)
-        log_debug("[CONTEXT_MANAGER] compact_history()")
+        log_debug("[COMPRESSION_MANAGER] compress_message_history()")
         result = self._history_compactor.compact(messages, run_response, run_metrics)
         self._sync_stats()
         return result
 
-    async def acompact_history(
+    async def acompress_message_history(
         self,
         messages: List[Message],
         run_response: Optional["RunOutput"] = None,
         run_metrics: Optional["RunMetrics"] = None,
     ) -> CompactionResult:
-        """Async compact history into summary message."""
+        """Async compress message history into summary message."""
         if self._history_compactor is None:
             return CompactionResult(compacted_messages=messages, summary=None)
-        log_debug("[CONTEXT_MANAGER] acompact_history()")
+        log_debug("[COMPRESSION_MANAGER] acompress_message_history()")
         result = await self._history_compactor.acompact(messages, run_response, run_metrics)
         self._sync_stats()
         return result
@@ -192,15 +196,15 @@ class CompressionManager:
         """Compress context using cheapest-first escalation.
 
         1. Tool compression first (lightweight)
-        2. History compaction if still needed (heavier)
+        2. Message compression if still needed (heavier)
         """
         # 1. Tool compression
         if self.should_compress_tools(messages, tools, model, response_format):
             self.compress_tools(messages, run_metrics)
 
-        # 2. History compaction
-        if self.should_compact_history(messages):
-            return self.compact_history(messages, run_response, run_metrics)
+        # 2. Message compression
+        if self.should_compress_messages(messages):
+            return self.compress_message_history(messages, run_response, run_metrics)
 
         return CompactionResult(compacted_messages=messages, summary=None)
 
@@ -218,9 +222,9 @@ class CompressionManager:
         if await self.ashould_compress_tools(messages, tools, model, response_format):
             await self.acompress_tools(messages, run_metrics)
 
-        # 2. History compaction
-        if await self.ashould_compact_history(messages):
-            return await self.acompact_history(messages, run_response, run_metrics)
+        # 2. Message compression
+        if await self.ashould_compress_messages(messages):
+            return await self.acompress_message_history(messages, run_response, run_metrics)
 
         return CompactionResult(compacted_messages=messages, summary=None)
 
